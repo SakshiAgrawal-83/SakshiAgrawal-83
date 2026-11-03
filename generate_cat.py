@@ -1,6 +1,5 @@
 
 import os
-import re
 import urllib.request
 from datetime import date, timedelta
 from html.parser import HTMLParser
@@ -8,10 +7,9 @@ from html.parser import HTMLParser
 from PIL import Image, ImageDraw
 
 
-# Get GitHub username
+# GitHub username
 USERNAME = os.environ["GITHUB_USER"]
 
-# Fetch GitHub contribution page
 url = f"https://github.com/users/{USERNAME}/contributions"
 
 request = urllib.request.Request(
@@ -23,7 +21,7 @@ with urllib.request.urlopen(request) as response:
     html = response.read().decode("utf-8")
 
 
-# Extract contribution dates and levels from HTML
+# Extract contribution dates and levels
 class ContributionParser(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -48,15 +46,12 @@ parser.feed(html)
 contributions = parser.contributions
 
 if not contributions:
-    raise RuntimeError(
-        "No contribution data found. GitHub may have changed its page format "
-        "or blocked the request."
-    )
+    raise RuntimeError("No contribution data found.")
 
 print(f"Found {len(contributions)} contribution days.")
 
 
-# Calculate contribution graph dimensions
+# Graph dimensions
 dates = sorted(date.fromisoformat(d) for d in contributions)
 
 start = dates[0] - timedelta(days=dates[0].weekday())
@@ -67,7 +62,7 @@ GAP = 5
 STEP = CELL + GAP
 
 LEFT = 30
-TOP = 65
+TOP = 45
 
 WIDTH = LEFT + weeks * STEP + 30
 HEIGHT = TOP + 7 * STEP + 25
@@ -83,34 +78,48 @@ PURPLE = [
 ]
 
 
-# Pixel cat design
-CAT = [
-    "....LLL.......",
-    "...LWWLWL......",
-    "...LWLWLL......",
-    "..LLLLLLLLL....",
-    ".LWWWWWWWWWL...",
-    ".LWWKWWKWWWL...",
-    ".LWWWWWWWWWL...",
-    "..LWWWPWWWL....",
-    "...LLLLLLL.....",
-    "...L..L..L.....",
-    "..LL..LL..LL...",
-    "..............."
+# Tiny pixel cat
+CAT_CLOSED = [
+    "..L.L..",
+    ".LLLLL.",
+    "LWK.WKL",
+    "LWWWWWL",
+    "LW.P.WL",
+    ".L...L.",
+    "..LLL.."
 ]
 
-COLORS = {
+CAT_OPEN = [
+    "..L.L..",
+    ".LLLLL.",
+    "LWK.WKL",
+    "LWWWWWL",
+    "LW.O.WL",
+    ".L...L.",
+    "..LLL.."
+]
+
+CAT_COLORS = {
     "L": (177, 143, 224),
     "W": (255, 239, 250),
     "K": (43, 31, 60),
-    "P": (235, 139, 190)
+    "P": (235, 139, 190),
+    "O": (235, 100, 170)
 }
 
 
-def draw_cat(draw, x, y, frame):
-    scale = 3
+def draw_cat(draw, center_x, center_y, frame_no):
+    # Alternate between closed and open mouth
+    cat = CAT_OPEN if frame_no % 2 == 0 else CAT_CLOSED
 
-    for row, line in enumerate(CAT):
+    scale = 2
+    cat_width = 7 * scale
+    cat_height = 7 * scale
+
+    x = center_x - cat_width // 2
+    y = center_y - cat_height // 2
+
+    for row, line in enumerate(cat):
         for col, pixel in enumerate(line):
             if pixel == ".":
                 continue
@@ -122,25 +131,54 @@ def draw_cat(draw, x, y, frame):
                     x + (col + 1) * scale - 1,
                     y + (row + 1) * scale - 1
                 ),
-                fill=COLORS[pixel]
+                fill=CAT_COLORS[pixel]
             )
 
 
-# Generate animation frames
+# Keep only days with actual contributions
+active_dates = sorted(
+    date.fromisoformat(day)
+    for day, level in contributions.items()
+    if level > 0
+)
+
+if not active_dates:
+    raise RuntimeError("No contribution days found to eat!")
+
+
+# Limit frames to keep the GIF reasonably small
+MAX_FRAMES = 120
+
+if len(active_dates) > MAX_FRAMES:
+    target_dates = [
+        active_dates[
+            round(i * (len(active_dates) - 1) / (MAX_FRAMES - 1))
+        ]
+        for i in range(MAX_FRAMES)
+    ]
+else:
+    target_dates = active_dates
+
+
 frames = []
 
-cat_width = 14 * 3
-total_frames = 53
-
-for frame_no in range(total_frames):
+for frame_no, target_day in enumerate(target_dates):
 
     image = Image.new("RGB", (WIDTH, HEIGHT), BG)
     draw = ImageDraw.Draw(image)
 
-    # Draw contribution graph
+    # All contributions up to the current target are eaten
+    eaten_dates = set(
+        day for day in active_dates if day < target_day
+    )
+
+    # Draw contribution graph, excluding eaten squares
     for day, level in contributions.items():
 
         current = date.fromisoformat(day)
+
+        if current in eaten_dates:
+            continue
 
         week = (current - start).days // 7
         weekday = current.weekday()
@@ -154,40 +192,33 @@ for frame_no in range(total_frames):
             fill=PURPLE[min(level, 4)]
         )
 
-    # Move cat across the graph
-    travel = max(1, WIDTH - cat_width - 40)
+    # Position cat on the current contribution
+    week = (target_day - start).days // 7
+    weekday = target_day.weekday()
 
-    cat_x = 20 + int(
-        travel * frame_no / (total_frames - 1)
-    )
+    center_x = LEFT + week * STEP + CELL // 2
+    center_y = TOP + weekday * STEP + CELL // 2
 
-    cat_y = 8 + (frame_no % 2) * 2
-
-    draw_cat(draw, cat_x, cat_y, frame_no)
-
-    # Paw prints
-    for paw in range(3):
-        px = cat_x - 12 - paw * 15
-        py = 43 + (paw % 2) * 3
-
-        draw.ellipse(
-            (px, py, px + 4, py + 4),
-            fill=(147, 112, 190)
-        )
+    draw_cat(draw, center_x, center_y, frame_no)
 
     frames.append(image)
 
 
-# Save GIF
+# Add a final empty-graph frame before the loop restarts
+final_image = Image.new("RGB", (WIDTH, HEIGHT), BG)
+frames.append(final_image)
+
+
+# Save animated GIF
 os.makedirs("dist", exist_ok=True)
 
 frames[0].save(
     "dist/cat-contributions.gif",
     save_all=True,
     append_images=frames[1:],
-    duration=120,
+    duration=100,
     loop=0,
     optimize=True
 )
 
-print("Pixel cat contribution animation generated successfully!")
+print("Pixel cat finished eating the contribution graph!")
