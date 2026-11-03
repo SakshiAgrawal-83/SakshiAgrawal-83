@@ -1,1 +1,46 @@
 
+
+name: Generate Pixel Cat
+
+on:
+  schedule:
+    - cron: "0 */12 * * *"
+
+  workflow_dispatch:
+
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Pillow
+        run: pip install pillow
+
+      - name: Generate Pixel Cat
+        env:
+          GITHUB_USER: ${{ github.repository_owner }}
+        run: python generate_cat.py
+
+      - name: Publish GIF
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          publish_branch: output
+          publish_dir: ./dist
+          publish_files: |
+            cat-contributions.gif
+          github_token: ${{ secrets.GITHUB_TOKEN }}
