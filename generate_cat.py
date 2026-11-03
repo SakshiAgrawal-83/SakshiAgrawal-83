@@ -7,7 +7,10 @@ from html.parser import HTMLParser
 from PIL import Image, ImageDraw
 
 
-# GitHub username
+# --------------------------------------------------
+# 1. GET YOUR REAL GITHUB CONTRIBUTION DATA
+# --------------------------------------------------
+
 USERNAME = os.environ["GITHUB_USER"]
 
 url = f"https://github.com/users/{USERNAME}/contributions"
@@ -21,7 +24,6 @@ with urllib.request.urlopen(request) as response:
     html = response.read().decode("utf-8")
 
 
-# Extract contribution dates and levels
 class ContributionParser(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -46,12 +48,15 @@ parser.feed(html)
 contributions = parser.contributions
 
 if not contributions:
-    raise RuntimeError("No contribution data found.")
+    raise RuntimeError("No GitHub contribution data found.")
 
-print(f"Found {len(contributions)} contribution days.")
+print(f"Loaded {len(contributions)} contribution days.")
 
 
-# Graph dimensions
+# --------------------------------------------------
+# 2. CONTRIBUTION GRAPH DESIGN
+# --------------------------------------------------
+
 dates = sorted(date.fromisoformat(d) for d in contributions)
 
 start = dates[0] - timedelta(days=dates[0].weekday())
@@ -61,13 +66,13 @@ CELL = 13
 GAP = 5
 STEP = CELL + GAP
 
-LEFT = 30
+LEFT = 35
 TOP = 45
 
-WIDTH = LEFT + weeks * STEP + 30
-HEIGHT = TOP + 7 * STEP + 25
+WIDTH = LEFT + weeks * STEP + 35
+HEIGHT = TOP + 7 * STEP + 30
 
-BG = (25, 22, 42)
+BACKGROUND = (25, 22, 42)
 
 PURPLE = [
     (43, 35, 65),
@@ -78,147 +83,303 @@ PURPLE = [
 ]
 
 
-# Tiny pixel cat
-CAT_CLOSED = [
-    "..L.L..",
-    ".LLLLL.",
-    "LWK.WKL",
-    "LWWWWWL",
-    "LW.P.WL",
-    ".L...L.",
-    "..LLL.."
-]
+def get_position(day):
+    current = date.fromisoformat(day)
 
-CAT_OPEN = [
-    "..L.L..",
-    ".LLLLL.",
-    "LWK.WKL",
-    "LWWWWWL",
-    "LW.O.WL",
-    ".L...L.",
-    "..LLL.."
-]
+    week = (current - start).days // 7
+    weekday = current.weekday()
 
-CAT_COLORS = {
-    "L": (177, 143, 224),
-    "W": (255, 239, 250),
-    "K": (43, 31, 60),
-    "P": (235, 139, 190),
-    "O": (235, 100, 170)
-}
+    x = LEFT + week * STEP + CELL // 2
+    y = TOP + weekday * STEP + CELL // 2
+
+    return x, y
 
 
-def draw_cat(draw, center_x, center_y, frame_no):
-    # Alternate between closed and open mouth
-    cat = CAT_OPEN if frame_no % 2 == 0 else CAT_CLOSED
-
-    scale = 2
-    cat_width = 7 * scale
-    cat_height = 7 * scale
-
-    x = center_x - cat_width // 2
-    y = center_y - cat_height // 2
-
-    for row, line in enumerate(cat):
-        for col, pixel in enumerate(line):
-            if pixel == ".":
-                continue
-
-            draw.rectangle(
-                (
-                    x + col * scale,
-                    y + row * scale,
-                    x + (col + 1) * scale - 1,
-                    y + (row + 1) * scale - 1
-                ),
-                fill=CAT_COLORS[pixel]
-            )
-
-
-# Keep only days with actual contributions
+# Only actual contribution days
 active_dates = sorted(
-    date.fromisoformat(day)
-    for day, level in contributions.items()
+    day for day, level in contributions.items()
     if level > 0
 )
 
 if not active_dates:
-    raise RuntimeError("No contribution days found to eat!")
+    raise RuntimeError("There are no contribution days for the cat to eat.")
 
 
-# Limit frames to keep the GIF reasonably small
-MAX_FRAMES = 120
+# --------------------------------------------------
+# 3. PIXEL CAT
+# --------------------------------------------------
 
-if len(active_dates) > MAX_FRAMES:
-    target_dates = [
-        active_dates[
-            round(i * (len(active_dates) - 1) / (MAX_FRAMES - 1))
-        ]
-        for i in range(MAX_FRAMES)
-    ]
-else:
-    target_dates = active_dates
+CAT_COLORS = {
+    "L": (177, 143, 224),   # Lavender outline
+    "W": (255, 239, 250),   # White fur
+    "K": (43, 31, 60),      # Eyes
+    "P": (235, 139, 190),   # Nose
+    "O": (235, 100, 170),   # Open mouth
+}
+
+CAT_CLOSED = [
+    "..L.....L..",
+    ".LLL...LLL.",
+    "LWWLLLLLWWL",
+    "LWKWWWWKWLL",
+    "LWWWWWWWWLL",
+    ".LWWPWWWWL.",
+    "..LWWWWLL..",
+    "...LLLLL...",
+    "..L.....L.."
+]
+
+CAT_OPEN = [
+    "..L.....L..",
+    ".LLL...LLL.",
+    "LWWLLLLLWWL",
+    "LWKWWWWKWLL",
+    "LWWWWWWWWLL",
+    ".LWWPOWWWL.",
+    "..LWWWWLL..",
+    "...LLLLL...",
+    "..L.....L.."
+]
+
+CAT_WIDE = [
+    "..L.....L..",
+    ".LLL...LLL.",
+    "LWWLLLLLWWL",
+    "LWKWWWWKWLL",
+    "LWWWWWWWWLL",
+    ".LWWPOOWWL.",
+    "..LWWWWLL..",
+    "...LLLLL...",
+    "..L.....L.."
+]
 
 
-frames = []
+def draw_cat(image, center_x, center_y, state, facing, walk_frame=0):
+    sprite = Image.new("RGBA", (22, 20), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(sprite)
 
-for frame_no, target_day in enumerate(target_dates):
+    patterns = {
+        "walk": CAT_CLOSED,
+        "closed": CAT_CLOSED,
+        "open": CAT_OPEN,
+        "wide": CAT_WIDE
+    }
 
-    image = Image.new("RGB", (WIDTH, HEIGHT), BG)
-    draw = ImageDraw.Draw(image)
+    pattern = patterns[state]
 
-    # All contributions up to the current target are eaten
-    eaten_dates = set(
-        day for day in active_dates if day < target_day
+    scale = 2
+    start_x = (22 - 11 * scale) // 2
+    start_y = 0
+
+    for row, line in enumerate(pattern):
+        for col, pixel in enumerate(line):
+            if pixel == ".":
+                continue
+
+            x = start_x + col * scale
+            y = start_y + row * scale
+
+            draw.rectangle(
+                (x, y, x + scale - 1, y + scale - 1),
+                fill=CAT_COLORS[pixel]
+            )
+
+    # Moving paws while walking
+    if state == "walk":
+        paw_shift = 1 if walk_frame % 2 else 0
+
+        draw.rectangle(
+            (6, 17 - paw_shift, 8, 19 - paw_shift),
+            fill=CAT_COLORS["L"]
+        )
+        draw.rectangle(
+            (14, 17 + paw_shift, 16, 19 + paw_shift),
+            fill=CAT_COLORS["L"]
+        )
+
+    if facing < 0:
+        sprite = sprite.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+
+    image.paste(
+        sprite,
+        (int(center_x - 11), int(center_y - 10)),
+        sprite
     )
 
-    # Draw contribution graph, excluding eaten squares
+
+# --------------------------------------------------
+# 4. DRAW THE GRAPH AND ANIMATION FRAME
+# --------------------------------------------------
+
+frames = []
+palette = None
+
+
+def add_frame(eaten, cat_position, state, facing=1, walk_frame=0,
+              target_position=None, particle_frame=0):
+
+    global palette
+
+    image = Image.new("RGB", (WIDTH, HEIGHT), BACKGROUND)
+    draw = ImageDraw.Draw(image)
+
+    # Draw every contribution that has not been eaten
     for day, level in contributions.items():
 
-        current = date.fromisoformat(day)
-
-        if current in eaten_dates:
+        if day in eaten:
             continue
 
-        week = (current - start).days // 7
-        weekday = current.weekday()
-
-        x = LEFT + week * STEP
-        y = TOP + weekday * STEP
+        x, y = get_position(day)
 
         draw.rounded_rectangle(
-            (x, y, x + CELL, y + CELL),
+            (
+                x - CELL // 2,
+                y - CELL // 2,
+                x + CELL // 2,
+                y + CELL // 2
+            ),
             radius=3,
             fill=PURPLE[min(level, 4)]
         )
 
-    # Position cat on the current contribution
-    week = (target_day - start).days // 7
-    weekday = target_day.weekday()
+    # Small bite particles
+    if target_position and particle_frame > 0:
+        tx, ty = target_position
 
-    center_x = LEFT + week * STEP + CELL // 2
-    center_y = TOP + weekday * STEP + CELL // 2
+        particles = [
+            (-9, -8),
+            (8, -10),
+            (10, 5),
+            (-8, 9)
+        ]
 
-    draw_cat(draw, center_x, center_y, frame_no)
+        for index, (dx, dy) in enumerate(particles):
+            if index < particle_frame:
+                draw.rectangle(
+                    (
+                        tx + dx,
+                        ty + dy,
+                        tx + dx + 3,
+                        ty + dy + 3
+                    ),
+                    fill=(255, 190, 235)
+                )
 
-    frames.append(image)
+    # Draw the cat on top of the graph
+    cx, cy = cat_position
+
+    draw_cat(
+        image,
+        cx,
+        cy,
+        state,
+        facing,
+        walk_frame
+    )
+
+    # Use one shared palette to keep the GIF consistent
+    if palette is None:
+        palette = image.convert(
+            "P",
+            palette=Image.Palette.ADAPTIVE,
+            colors=128
+        )
+        frames.append(palette)
+    else:
+        frames.append(image.quantize(palette=palette))
 
 
-# Add a final empty-graph frame before the loop restarts
-final_image = Image.new("RGB", (WIDTH, HEIGHT), BG)
-frames.append(final_image)
+# --------------------------------------------------
+# 5. WALK SMOOTHLY AND EAT CONTRIBUTIONS
+# --------------------------------------------------
+
+eaten = set()
+
+first_x, first_y = get_position(active_dates[0])
+
+# Cat starts just before the first contribution
+previous_position = (first_x - 24, first_y)
+
+for index, day in enumerate(active_dates):
+
+    target_position = get_position(day)
+    tx, ty = target_position
+
+    px, py = previous_position
+
+    facing = 1 if tx >= px else -1
+
+    # Smooth movement between contribution squares
+    movement_frames = 3
+
+    for step in range(1, movement_frames + 1):
+
+        progress = step / movement_frames
+
+        x = px + (tx - px) * progress
+        y = py + (ty - py) * progress
+
+        add_frame(
+            eaten,
+            (x, y),
+            "walk",
+            facing,
+            walk_frame=step
+        )
+
+    # Pause and chew the contribution
+    for bite in ["closed", "open", "wide", "open"]:
+
+        add_frame(
+            eaten,
+            target_position,
+            bite,
+            facing,
+            target_position=target_position,
+            particle_frame=1 if bite == "open" else 0
+        )
+
+    # Remove this contribution after the bite
+    eaten.add(day)
+
+    # Update cat position for next contribution
+    previous_position = target_position
+
+    if index % 25 == 0:
+        print(f"Cat has eaten {index + 1}/{len(active_dates)} contributions.")
 
 
-# Save animated GIF
+# --------------------------------------------------
+# 6. FINISH AND RESTART THE LOOP
+# --------------------------------------------------
+
+last_position = get_position(active_dates[-1])
+
+# Short pause after the final contribution is eaten
+for _ in range(5):
+    add_frame(
+        eaten,
+        last_position,
+        "closed"
+    )
+
+
+# --------------------------------------------------
+# 7. SAVE THE ANIMATED GIF
+# --------------------------------------------------
+
 os.makedirs("dist", exist_ok=True)
 
 frames[0].save(
     "dist/cat-contributions.gif",
     save_all=True,
     append_images=frames[1:],
-    duration=100,
+    duration=90,
     loop=0,
-    optimize=True
+    optimize=True,
+    disposal=2
 )
 
-print("Pixel cat finished eating the contribution graph!")
+print("Pixel cat finished eating!")
+print(f"Total contribution days eaten: {len(active_dates)}")
+print("GIF saved to dist/cat-contributions.gif")
