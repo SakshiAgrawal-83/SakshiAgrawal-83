@@ -3,36 +3,63 @@ import os
 import re
 import urllib.request
 from datetime import date, timedelta
+from html.parser import HTMLParser
+
 from PIL import Image, ImageDraw
 
+
+# Get GitHub username
 USERNAME = os.environ["GITHUB_USER"]
 
+# Fetch GitHub contribution page
 url = f"https://github.com/users/{USERNAME}/contributions"
 
 request = urllib.request.Request(
     url,
-    headers={"User-Agent": "GitHub-Pixel-Cat"}
+    headers={"User-Agent": "Mozilla/5.0"}
 )
 
 with urllib.request.urlopen(request) as response:
-    svg = response.read().decode("utf-8")
+    html = response.read().decode("utf-8")
 
-contributions = {}
 
-for tag in re.findall(r"<rect\b[^>]*>", svg):
-    d = re.search(r'data-date="([^"]+)"', tag)
-    level = re.search(r'data-level="([^"]+)"', tag)
+# Extract contribution dates and levels from HTML
+class ContributionParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.contributions = {}
 
-    if d and level:
-        contributions[d.group(1)] = int(level.group(1))
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+
+        day = attributes.get("data-date")
+        level = attributes.get("data-level")
+
+        if day and level is not None:
+            try:
+                self.contributions[day] = int(level)
+            except ValueError:
+                pass
+
+
+parser = ContributionParser()
+parser.feed(html)
+
+contributions = parser.contributions
 
 if not contributions:
-    raise RuntimeError("No contribution data found.")
+    raise RuntimeError(
+        "No contribution data found. GitHub may have changed its page format "
+        "or blocked the request."
+    )
 
+print(f"Found {len(contributions)} contribution days.")
+
+
+# Calculate contribution graph dimensions
 dates = sorted(date.fromisoformat(d) for d in contributions)
 
 start = dates[0] - timedelta(days=dates[0].weekday())
-
 weeks = ((dates[-1] - start).days // 7) + 1
 
 CELL = 13
@@ -55,6 +82,8 @@ PURPLE = [
     (226, 163, 255)
 ]
 
+
+# Pixel cat design
 CAT = [
     "....LLL.......",
     "...LWWLWL......",
@@ -77,20 +106,14 @@ COLORS = {
     "P": (235, 139, 190)
 }
 
+
 def draw_cat(draw, x, y, frame):
     scale = 3
 
     for row, line in enumerate(CAT):
         for col, pixel in enumerate(line):
-
             if pixel == ".":
                 continue
-
-            if row >= 9 and frame % 2:
-                if row == 9:
-                    col += 1
-                elif row == 10:
-                    col -= 1
 
             draw.rectangle(
                 (
@@ -102,6 +125,8 @@ def draw_cat(draw, x, y, frame):
                 fill=COLORS[pixel]
             )
 
+
+# Generate animation frames
 frames = []
 
 cat_width = 14 * 3
@@ -112,10 +137,11 @@ for frame_no in range(total_frames):
     image = Image.new("RGB", (WIDTH, HEIGHT), BG)
     draw = ImageDraw.Draw(image)
 
-    # Draw actual contribution calendar
+    # Draw contribution graph
     for day, level in contributions.items():
 
         current = date.fromisoformat(day)
+
         week = (current - start).days // 7
         weekday = current.weekday()
 
@@ -128,8 +154,9 @@ for frame_no in range(total_frames):
             fill=PURPLE[min(level, 4)]
         )
 
-    # Cat walking above contribution calendar
+    # Move cat across the graph
     travel = max(1, WIDTH - cat_width - 40)
+
     cat_x = 20 + int(
         travel * frame_no / (total_frames - 1)
     )
@@ -138,7 +165,7 @@ for frame_no in range(total_frames):
 
     draw_cat(draw, cat_x, cat_y, frame_no)
 
-    # Paw prints behind the cat
+    # Paw prints
     for paw in range(3):
         px = cat_x - 12 - paw * 15
         py = 43 + (paw % 2) * 3
@@ -150,6 +177,8 @@ for frame_no in range(total_frames):
 
     frames.append(image)
 
+
+# Save GIF
 os.makedirs("dist", exist_ok=True)
 
 frames[0].save(
@@ -161,4 +190,4 @@ frames[0].save(
     optimize=True
 )
 
-print("Pixel cat contribution animation generated!")
+print("Pixel cat contribution animation generated successfully!")
