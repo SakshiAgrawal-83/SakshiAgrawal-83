@@ -11,9 +11,7 @@ from PIL import Image, ImageDraw
 # --------------------------------------------------
 # 1. GET YOUR REAL GITHUB CONTRIBUTION DATA
 # --------------------------------------------------
-# Usage:  GITHUB_USER=yourname python cat_contributions.py
-#    or:  python cat_contributions.py yourname
-
+# MY_GITHUB_USERNAME = "SakshiAgrawal-83"  
 USERNAME = os.environ.get("GITHUB_USER") or (sys.argv[1] if len(sys.argv) > 1 else None)
 if not USERNAME:
     raise SystemExit("Set GITHUB_USER or pass your username: python cat_contributions.py yourname")
