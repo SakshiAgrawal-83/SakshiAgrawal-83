@@ -62,9 +62,9 @@ A Human Resource and Employee Management System designed to simplify employee ad
 
 ## GitHub Statistics
 
-![GitHub Stats](https://github-readme-stats.vercel.app/api?username=SakshiAgrawal-83&show_icons=true&theme=tokyonight&hide_border=true&rank_icon=github&count_private=true&include_all_commits=true)
+![GitHub Statistics](./github-metrics.svg)
 
-![Top Languages](https://github-readme-stats.vercel.app/api/top-langs/?username=SakshiAgrawal-83&layout=compact&theme=tokyonight&hide_border=true)
+![Top Languages](./github-languages.svg)
 
 ![GitHub Streak](https://streak-stats.demolab.com/?user=SakshiAgrawal-83&theme=tokyonight&hide_border=true)
 
