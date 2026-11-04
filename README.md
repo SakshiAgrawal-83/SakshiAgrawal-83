@@ -4,10 +4,10 @@
 
 I'm a Computing student interested in building practical web applications and exploring new technologies. I enjoy working across frontend and backend development, learning by building projects, and solving real-world problems through code.
 
-- BSc (Hons) Computing at Islington College
-- Junior MERN Stack Developer at Mercy Technology
-- Currently exploring Next.js and Artificial Intelligence
-- Interested in Full-Stack Development and Software Engineering
+- 🎓 BSc (Hons) Computing at Islington College
+- 💻 Junior MERN Stack Developer at Mercy Technology
+- 🌱 Currently exploring Next.js and Artificial Intelligence
+- 🚀 Interested in Full-Stack Development and Software Engineering
 
 ---
 
@@ -62,10 +62,6 @@ A Human Resource and Employee Management System designed to simplify employee ad
 
 ## GitHub Statistics
 
-![GitHub Statistics](./github-metrics.svg)
-
-![Top Languages](./github-languages.svg)
-
 ![GitHub Streak](https://streak-stats.demolab.com/?user=SakshiAgrawal-83&theme=tokyonight&hide_border=true)
 
 ---
@@ -84,4 +80,4 @@ A Human Resource and Employee Management System designed to simplify employee ad
 
 ---
 
- Thanks for visiting my profile!
+⭐ Thanks for visiting my profile!
