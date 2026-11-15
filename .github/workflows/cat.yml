@@ -1,5 +1,4 @@
 
-
 name: Generate Pixel Cat
 
 on:
@@ -41,6 +40,4 @@ jobs:
         with:
           publish_branch: output
           publish_dir: ./dist
-          publish_files: |
-            cat-contributions.gif
           github_token: ${{ secrets.GITHUB_TOKEN }}
