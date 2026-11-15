@@ -15,8 +15,7 @@ GITHUB_USER = "SakshiAgrawal-83"
 
 USERNAME = os.environ.get("GITHUB_USER") or GITHUB_USER
 
-GH_EXE = r"C:\Program Files\GitHub CLI\gh.exe"
-
+GH_EXE = "gh"
 YEAR_START = date(2026, 1, 1)
 YEAR_END = date(2026, 12, 31)
 
