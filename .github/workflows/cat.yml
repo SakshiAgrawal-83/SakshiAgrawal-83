@@ -33,6 +33,7 @@ jobs:
       - name: Generate Pixel Cat
         env:
           GITHUB_USER: ${{ github.repository_owner }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python generate_cat.py
 
       - name: Publish GIF
